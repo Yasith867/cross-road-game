@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Crossy Road - Blockchain Edition</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+  </head>
+  <body>
+    <div id="counter" data-testid="text-score">0</div>
+
+    <div id="wallet-panel">
+      <button id="connectWallet" data-testid="button-connect-wallet">Connect Wallet</button>
+      <div id="walletAddress" data-testid="text-wallet-address"></div>
+    </div>
+
+    <div id="controlls">
+      <div>
+        <button id="forward" data-testid="button-forward">
+          <svg width="30" height="30" viewBox="0 0 10 10">
+            <g transform="rotate(0, 5,5)">
+              <path d="M5,4 L7,6 L3,6 L5,4" />
+            </g>
+          </svg>
+        </button>
+        <button id="left" data-testid="button-left">
+          <svg width="30" height="30" viewBox="0 0 10 10">
+            <g transform="rotate(-90, 5,5)">
+              <path d="M5,4 L7,6 L3,6 L5,4" />
+            </g>
+          </svg>
+        </button>
+        <button id="backward" data-testid="button-backward">
+          <svg width="30" height="30" viewBox="0 0 10 10">
+            <g transform="rotate(180, 5,5)">
+              <path d="M5,4 L7,6 L3,6 L5,4" />
+            </g>
+          </svg>
+        </button>
+        <button id="right" data-testid="button-right">
+          <svg width="30" height="30" viewBox="0 0 10 10">
+            <g transform="rotate(90, 5,5)">
+              <path d="M5,4 L7,6 L3,6 L5,4" />
+            </g>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="end">
+      <div class="end-modal">
+        <h1 id="game-over-title">Game Over</h1>
+        <div id="final-score" data-testid="text-final-score">Score: <span id="score-value">0</span></div>
+        <div id="tx-status" data-testid="text-tx-status"></div>
+        <button id="retry" data-testid="button-retry">Retry</button>
+        <a id="explorer-link" data-testid="link-explorer" target="_blank" style="display: none;">View on Explorer</a>
+      </div>
+    </div>
+
+    <div id="toast" data-testid="text-toast"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/99/three.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
