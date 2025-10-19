@@ -4,12 +4,15 @@ import { encodeFunctionData } from "viem";
 // Replace with actual deployed contract address after deployment
 const SCORE_CONTRACT = process.env.SCOREBOARD_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000";
 
-export async function submitScore(score) {
+export async function submitScore(score, playerAddress) {
   if (!SCORE_CONTRACT || SCORE_CONTRACT === "0x0000000000000000000000000000000000000000") {
     throw new Error("SCOREBOARD_CONTRACT_ADDRESS not configured. Please deploy the contract first.");
   }
 
   const smartAccount = await smartAccountPromise;
+
+  // Use provided playerAddress or fallback to smartAccount address
+  const player = playerAddress || smartAccount.address;
 
   // Encode call to submitScore(address player, uint256 score)
   const data = encodeFunctionData({
@@ -23,7 +26,7 @@ export async function submitScore(score) {
         ],
       },
     ],
-    args: [smartAccount.address, BigInt(score)],
+    args: [player, BigInt(score)],
   });
 
   const maxFeePerGas = 1000000000n; // 1 gwei

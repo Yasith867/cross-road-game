@@ -54,10 +54,10 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`🎮 Crossy Road Blockchain Server running at http://localhost:${PORT}`);
-  console.log(`🔗 API endpoint: http://localhost:${PORT}/api/submit-score`);
+const PORT = 5000;
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🎮 Crossy Road Blockchain Server running at http://0.0.0.0:${PORT}`);
+  console.log(`🔗 API endpoint: http://0.0.0.0:${PORT}/api/submit-score`);
   console.log(`⚙️  Environment: ${process.env.NODE_ENV || "development"}`);
 });
 
