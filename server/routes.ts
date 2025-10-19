@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import cors from "cors";
+// @ts-ignore - JavaScript module without types
 import { submitScore } from "../web3/submitScore.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
