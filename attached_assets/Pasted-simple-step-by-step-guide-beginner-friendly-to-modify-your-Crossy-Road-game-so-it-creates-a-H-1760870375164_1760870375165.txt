@@ -1,0 +1,369 @@
+simple, step-by-step guide (beginner friendly) to modify your Crossy Road game so it:
+
+creates a Hybrid MetaMask Smart Account (server-side using a private key),
+
+stores a score on Monad testnet (via a simple Scoreboard smart contract),
+
+submits the score gaslessly using Pimlico bundler/paymaster.
+
+Overview (short)
+
+Set up Node project with Vite (so your index.html, script.js, style.css work nicely).
+
+Add a small backend (Express) that uses @metamask/delegation-toolkit + viem and Pimlico RPC to send the user operation to Monad. Backend keeps the private key secret.
+
+Add a very small smart contract Scoreboard.sol and deploy it to Monad testnet.
+
+Modify your index.html + script.js to add a Connect Wallet button and call the backend API to submit the score.
+
+Prerequisites (what you need)
+
+Node.js v18 or later installed.
+
+A code editor (VS Code recommended).
+
+Basic terminal/command line knowledge (copy & paste commands).
+
+Install frontend dev tooling (Vite) and server libs:
+
+npm install -D vite
+npm install express dotenv
+
+
+Install blockchain libraries:
+
+npm install @metamask/delegation-toolkit viem
+
+
+Install Hardhat to deploy the smart contract:
+
+npm install -D hardhat @nomiclabs/hardhat-ethers ethers
+
+
+Add a simple package.json scripts (replace the existing "scripts" with these or merge them):
+
+"scripts": {
+  "dev": "vite",
+  "start": "node server.js",
+  "build": "vite build",
+  "deploy": "npx hardhat run --network monad scripts/deploy.js"
+}
+
+Step 2 — Project structure (create these files / folders)
+crossy-monad/
+├─ public/
+│  ├─ index.html     (copy your existing index.html here)
+│  ├─ style.css      (copy)
+│  └─ script.js      (we’ll edit this)
+├─ server.js         (backend server that submits score)
+├─ web3/
+│  ├─ config.js      (viem + delegation toolkit config)
+│  └─ submitScore.js (function called by server)
+├─ contracts/
+│  └─ Scoreboard.sol
+├─ scripts/
+│  └─ deploy.js      (deploy contract to Monad testnet)
+├─ .env
+└─ package.json
+
+
+Create public/ and move your index.html, style.css, script.js into public/.
+
+Step 3 — Add the Scoreboard smart contract
+
+Create contracts/Scoreboard.sol with:
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Scoreboard {
+    mapping(address => uint256) public highScores;
+    event ScoreSubmitted(address indexed player, uint256 score);
+
+    function submitScore(address player, uint256 score) external {
+        if (score > highScores[player]) {
+            highScores[player] = score;
+            emit ScoreSubmitted(player, score);
+        }
+    }
+}
+
+
+This contract just stores the high score for each player.
+
+Step 4 — Hardhat config & deploy script
+
+Initialize hardhat (if not already):
+
+npx hardhat
+# choose "Create an empty hardhat.config.js" or the basic option
+
+
+Edit hardhat.config.js to add a Monad network (example using Pimlico RPC). Replace 0x...PRIVATE_KEY... with your private key only in .env (not checked into git):
+
+require("dotenv").config();
+require("@nomiclabs/hardhat-ethers");
+
+module.exports = {
+  solidity: "0.8.20",
+  networks: {
+    monad: {
+      url: "https://api.pimlico.io/v2/10143/rpc?apikey=pim_7s3DQ8rudZmSN52Lv1CYEh",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    }
+  }
+};
+
+
+Create scripts/deploy.js:
+
+async function main() {
+  const Scoreboard = await ethers.getContractFactory("Scoreboard");
+  const scoreboard = await Scoreboard.deploy();
+  await scoreboard.deployed();
+  console.log("Scoreboard deployed to:", scoreboard.address);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+
+
+Set .env (create .env file):
+
+DEPLOYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_FOR_DEPLOY
+NEXT_PUBLIC_WALLET_PRIVATE_KEY=0x9700cf7d62c1b0ba4242c93a40007bed796aa6aa997d549563c7d4bc7be0635c
+
+
+Important: Keep .env private. Do NOT upload it to GitHub. Use .gitignore to ignore .env.
+
+Deploy the contract:
+
+npm run deploy
+
+
+After deploy finishes, copy the printed contract address. You will use it in server config.
+
+Step 5 — Backend: web3 config & submit score logic
+
+Create web3/config.js (this file uses viem and @metamask/delegation-toolkit):
+
+// web3/config.js
+import "dotenv/config";
+import { http, createPublicClient } from "viem";
+import { createBundlerClient, createPaymasterClient } from "viem/account-abstraction";
+import { monad } from "viem/chains"; // if viem has monad chain; if not use custom chain object
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { Implementation, toMetaMaskSmartAccount } from "@metamask/delegation-toolkit";
+
+const RPC = "https://api.pimlico.io/v2/10143/rpc?apikey=pim_7s3DQ8rudZmSN52Lv1CYEh";
+
+export const publicClient = createPublicClient({
+  chain: monad,
+  transport: http(RPC)
+});
+
+// create an account from private key (server-side signer for Hybrid account)
+const serverPrivateKey = process.env.NEXT_PUBLIC_WALLET_PRIVATE_KEY;
+const account = privateKeyToAccount(serverPrivateKey);
+
+// create a smart account (Hybrid)
+export const smartAccountPromise = (async () => {
+  const smartAccount = await toMetaMaskSmartAccount({
+    client: publicClient,
+    implementation: Implementation.Hybrid,
+    deployParams: [account.address, [], [], []],
+    deploySalt: "0x",
+    signer: { account }
+  });
+  return smartAccount;
+})();
+
+export const bundlerClient = createBundlerClient({
+  client: publicClient,
+  transport: http(RPC)
+});
+
+export const paymasterClient = createPaymasterClient({
+  transport: http(RPC)
+});
+
+
+Note: depending on viem version you may need slightly different imports. The above follows the examples you gave. If viem/chains lacks monad, use sepolia or define a simple chain object — for the Pimlico RPC it normally works.
+
+Create web3/submitScore.js:
+
+// web3/submitScore.js
+import { smartAccountPromise, bundlerClient, paymasterClient } from "./config.js";
+import { encodeFunctionData } from "viem";
+
+const SCORE_CONTRACT = "0xYOUR_DEPLOYED_SCOREBOARD_ADDRESS"; // replace after deploy
+
+export async function submitScore(score) {
+  const smartAccount = await smartAccountPromise;
+
+  // encode call to submitScore(address player, uint256 score)
+  const data = encodeFunctionData({
+    abi: [
+      {
+        name: "submitScore",
+        type: "function",
+        inputs: [
+          { name: "player", type: "address" },
+          { name: "score", type: "uint256" }
+        ]
+      }
+    ],
+    args: [smartAccount.address, BigInt(score)]
+  });
+
+  const maxFeePerGas = 1n; // Example minimal numbers - bundler may require different values
+  const maxPriorityFeePerGas = 1n;
+
+  const userOperationHash = await bundlerClient.sendUserOperation({
+    account: smartAccount,
+    calls: [{ to: SCORE_CONTRACT, data }],
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    paymaster: paymasterClient,
+  });
+
+  return userOperationHash;
+}
+
+
+Replace SCORE_CONTRACT with the contract address printed at deploy step.
+
+Step 6 — Create the server endpoint
+
+Create server.js at project root:
+
+// server.js
+import express from "express";
+import bodyParser from "body-parser";
+import { submitScore } from "./web3/submitScore.js";
+import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static("public"));
+
+app.post("/api/submit-score", async (req, res) => {
+  try {
+    const { score } = req.body;
+    if (typeof score !== "number") return res.status(400).json({ error: "score must be number" });
+
+    const txHash = await submitScore(score);
+    res.json({ success: true, userOperationHash: txHash });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+
+
+This server:
+
+serves your frontend (Vite dev will also serve but this is okay for production),
+
+receives POST /api/submit-score with { score: 5 },
+
+calls submitScore() to create and send the user operation.
+
+Step 7 — Modify your frontend (index.html + script.js)
+index.html
+
+Add a “Connect Wallet” and a hidden “Submitting…” UI. Put inside the body somewhere:
+
+<button id="connectWallet">Connect Wallet</button>
+<div id="walletAddress"></div>
+
+script.js (frontend changes)
+
+At top, add connect button handler and a function to call the server endpoint:
+
+// show user address using MetaMask extension (optional)
+document.getElementById("connectWallet").addEventListener("click", async () => {
+  if (!window.ethereum) return alert("Install MetaMask or MetaMask Embedded Wallet");
+  const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+  document.getElementById("walletAddress").innerText = `Connected: ${accounts[0]}`;
+});
+
+// function to call backend to submit score
+async function submitScoreToBackend(score) {
+  try {
+    const resp = await fetch("/api/submit-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score })
+    });
+    const json = await resp.json();
+    if (json.success) {
+      alert("Score submitted. Operation: " + json.userOperationHash);
+      console.log("UserOperationHash:", json.userOperationHash);
+    } else {
+      alert("Submission failed: " + (json.error || "unknown"));
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Submit error: " + err.message);
+  }
+}
+
+
+Now find your collision / game over block in script.js and replace the clause where it only shows the end screen. Replace it with a call to submitScoreToBackend(currentLane) (for example):
+
+if (chickenMaxX > carMinX && chickenMinX < carMaxX) {
+  endDOM.style.visibility = "visible";
+  // call backend to submit score (currentLane used as score)
+  submitScoreToBackend(currentLane);
+}
+
+
+That’s it for frontend changes.
+
+Step 8 — Run everything locally
+
+Start the backend server:
+
+node server.js
+# or npm start
+
+
+In another terminal, start Vite dev server (if you want hot reload and Vite dev URL):
+
+npx vite
+# or npm run dev
+
+Notes & Gotchas (simple)
+
+Private keys are secret. Keep .env private and never commit to GitHub.
+
+rpc & bundler values: I used Pimlico example RPC. That should work but bundlers may require realistic gas values. If you get errors, check bundler docs or adjust maxFeePerGas / maxPriorityFeePerGas values.
+
+If viem or delegation-toolkit versions mismatch, small import or call names may differ. If you see errors, share the error text and I’ll fix the exact code.
+
+If viem/chains doesn’t have monad, use sepolia for testing (but judges want Monad testnet — use Pimlico RPC).
+
+Summary of key commands you will run
+# install packages
+npm install -D vite hardhat
+npm install express dotenv @metamask/delegation-toolkit viem
+
+# deploy smart contract (after editing .env with DEPLOYER_PRIVATE_KEY)
+npm run deploy
+
+# run the backend
+node server.js
+
+# run dev frontend (optional)
+npx vite
+
+Build this for me
