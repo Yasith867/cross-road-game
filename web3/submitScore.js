@@ -10,6 +10,10 @@ export async function submitScore(score, playerAddress) {
   }
 
   const smartAccount = await smartAccountPromise;
+  
+  if (!smartAccount) {
+    throw new Error("Smart account not initialized. Please configure NEXT_PUBLIC_WALLET_PRIVATE_KEY.");
+  }
 
   // Use provided playerAddress or fallback to smartAccount address
   const player = playerAddress || smartAccount.address;

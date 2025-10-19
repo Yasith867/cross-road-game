@@ -37,13 +37,13 @@ export const publicClient = createPublicClient({
 // Create account from private key (server-side signer for Hybrid account)
 const serverPrivateKey = process.env.NEXT_PUBLIC_WALLET_PRIVATE_KEY;
 if (!serverPrivateKey) {
-  throw new Error("NEXT_PUBLIC_WALLET_PRIVATE_KEY environment variable is not set");
+  console.warn("NEXT_PUBLIC_WALLET_PRIVATE_KEY environment variable is not set - blockchain features will be disabled");
 }
 
-const account = privateKeyToAccount(serverPrivateKey);
+const account = serverPrivateKey ? privateKeyToAccount(serverPrivateKey) : null;
 
 // Create smart account (Hybrid) - async initialization
-export const smartAccountPromise = (async () => {
+export const smartAccountPromise = serverPrivateKey ? (async () => {
   try {
     const smartAccount = await toMetaMaskSmartAccount({
       client: publicClient,
@@ -58,7 +58,7 @@ export const smartAccountPromise = (async () => {
     console.error("Error initializing smart account:", error);
     throw error;
   }
-})();
+})() : Promise.resolve(null);
 
 export const bundlerClient = createBundlerClient({
   client: publicClient,

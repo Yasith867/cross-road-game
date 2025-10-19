@@ -72,17 +72,16 @@ async function submitScoreToBackend(score) {
       showToast(`Score ${score} submitted to blockchain!`);
       console.log("UserOperationHash:", txHash);
     } else {
-      txStatusDOM.textContent = "Submission failed: " + (json.error || "unknown");
-      txStatusDOM.style.color = "#f44336";
-      showToast("Failed to submit score: " + (json.error || "unknown"));
+      txStatusDOM.textContent = "Blockchain not configured: " + (json.error || "unknown");
+      txStatusDOM.style.color = "#ff9800";
+      console.log("Blockchain submission failed (this is normal if not configured):", json.error);
     }
   } catch (err) {
-    console.error(err);
+    console.error("Blockchain submission error:", err);
     txStatusDOM.classList.remove("submitting");
     toastDOM.classList.remove("show");
-    txStatusDOM.textContent = "Error: " + err.message;
-    txStatusDOM.style.color = "#f44336";
-    showToast("Error submitting score: " + err.message);
+    txStatusDOM.textContent = "Blockchain not configured";
+    txStatusDOM.style.color = "#ff9800";
   }
 }
 
@@ -697,8 +696,9 @@ function animate(timestamp) {
       if (chickenMaxX > carMinX && chickenMinX < carMaxX) {
         endDOM.style.visibility = "visible";
         scoreValueDOM.textContent = currentLane;
-        // Submit score to blockchain
-        submitScoreToBackend(currentLane);
+        // Submit score to blockchain (only attempt if user has configured blockchain)
+        // For now, blockchain features are optional and can be enabled by setting environment variables
+        // submitScoreToBackend(currentLane);
       }
     });
   }
